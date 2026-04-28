@@ -7,6 +7,8 @@ importScripts('./tab-manager.js');
 importScripts('../utils/rule-engine.js');
 importScripts('../utils/rule-manager.js');
 importScripts('./auto-grouper.js');
+importScripts('../utils/ai-intelligence-engine.js');
+importScripts('../utils/global-window-manager.js');
 
 class SuperTabServiceWorker {
   constructor() {
@@ -17,6 +19,8 @@ class SuperTabServiceWorker {
     this.ruleEngine = null;
     this.ruleManager = null;
     this.autoGrouper = null;
+    this.aiEngine = null;
+    this.globalWindowManager = null;
     this.initialized = false;
     this.initializationPromise = null;
     this.tabWatcher = null;
@@ -53,6 +57,16 @@ class SuperTabServiceWorker {
         this.ruleEngine = this.tabManager.ruleEngine || new RuleEngine();
         this.ruleManager = this.tabManager.ruleManager || new RuleManager(this.storageManager);
         this.autoGrouper = this.tabManager.autoGrouper || new AutoGrouper(this.tabManager, this.ruleEngine, this.ruleManager);
+
+        // Initialize AI Intelligence Engine
+        this.aiEngine = new AIIntelligenceEngine(this.storageManager, this.eventBus);
+        await this.aiEngine.initialize();
+        console.log('✅ AI Intelligence Engine initialized');
+
+        // Initialize Global Window Manager
+        this.globalWindowManager = new GlobalWindowManager(this.storageManager, this.eventBus, this.tabManager);
+        await this.globalWindowManager.initialize();
+        console.log('✅ Global Window Manager initialized');
 
         this.setupDataSyncEvents();
 
@@ -376,6 +390,293 @@ class SuperTabServiceWorker {
         case 'getPerformanceMetrics':
           const metrics = this.tabManager.getPerformanceMetrics();
           sendResponse({ success: true, data: metrics });
+          break;
+
+        // AI Intelligence Engine Actions
+        case 'analyzeTab':
+          if (!data?.tabUuid && !data?.tab) {
+            sendResponse({ success: false, error: 'tabUuid or tab data is required' });
+            break;
+          }
+          let tabToAnalyze = data.tab;
+          if (!tabToAnalyze && data.tabUuid) {
+            tabToAnalyze = await this.storageManager.getTab(data.tabUuid);
+          }
+          if (!tabToAnalyze) {
+            sendResponse({ success: false, error: 'Tab not found' });
+            break;
+          }
+          const analysisResult = await this.aiEngine.analyzeTab(tabToAnalyze);
+          sendResponse({ success: true, data: analysisResult });
+          break;
+
+        case 'analyzeAllTabs':
+          const allTabsToAnalyze = await this.tabManager.getAllTabs();
+          const allAnalysisResults = await this.aiEngine.analyzeTabs(allTabsToAnalyze);
+          sendResponse({ success: true, data: allAnalysisResults });
+          break;
+
+        case 'getAIConfig':
+          const aiConfig = this.aiEngine.getConfig();
+          sendResponse({ success: true, data: aiConfig });
+          break;
+
+        case 'updateAIConfig':
+          if (!data?.config) {
+            sendResponse({ success: false, error: 'config is required' });
+            break;
+          }
+          await this.aiEngine.updateConfig(data.config);
+          sendResponse({ success: true });
+          break;
+
+        case 'getBehaviorStats':
+          const behaviorStats = this.aiEngine.getBehaviorStats();
+          sendResponse({ success: true, data: behaviorStats });
+          break;
+
+        case 'getDomainCorrelationStats':
+          const domainStats = this.aiEngine.getDomainCorrelationStats();
+          sendResponse({ success: true, data: domainStats });
+          break;
+
+        // Global Window Manager Actions
+        case 'getAllWindows':
+          const windows = this.globalWindowManager.getAllWindows();
+          sendResponse({ success: true, data: windows });
+          break;
+
+        case 'getWindow':
+          if (!data?.windowId) {
+            sendResponse({ success: false, error: 'windowId is required' });
+            break;
+          }
+          const window = this.globalWindowManager.getWindow(data.windowId);
+          sendResponse({ success: true, data: window });
+          break;
+
+        case 'getAllTabsGlobal':
+          const allTabsGlobal = this.globalWindowManager.getAllTabsGlobal();
+          sendResponse({ success: true, data: allTabsGlobal });
+          break;
+
+        case 'searchTabsGlobal':
+          if (!data?.query) {
+            sendResponse({ success: false, error: 'query is required' });
+            break;
+          }
+          const searchOptions = data.options || {};
+          const searchResults = this.globalWindowManager.searchTabsGlobal(data.query, searchOptions);
+          sendResponse({ success: true, data: searchResults });
+          break;
+
+        case 'moveTabToWindow':
+          if (!data?.tabId || !data?.targetWindowId) {
+            sendResponse({ success: false, error: 'tabId and targetWindowId are required' });
+            break;
+          }
+          try {
+            const moveResult = await this.globalWindowManager.moveTabToWindow(
+              data.tabId,
+              data.targetWindowId,
+              data.targetIndex
+            );
+            sendResponse({ success: true, data: moveResult });
+            this.scheduleSidebarRefresh('tab_moved_to_window');
+          } catch (moveError) {
+            sendResponse({ success: false, error: moveError.message });
+          }
+          break;
+
+        case 'moveTabsToWindow':
+          if (!Array.isArray(data?.tabIds) || !data?.targetWindowId) {
+            sendResponse({ success: false, error: 'tabIds array and targetWindowId are required' });
+            break;
+          }
+          const batchMoveResults = await this.globalWindowManager.moveTabsToWindow(
+            data.tabIds,
+            data.targetWindowId,
+            data.targetIndex
+          );
+          sendResponse({ success: true, data: batchMoveResults });
+          this.scheduleSidebarRefresh('tabs_moved_to_window');
+          break;
+
+        case 'mergeTabsToCurrentWindow':
+          if (!Array.isArray(data?.tabIds)) {
+            sendResponse({ success: false, error: 'tabIds array is required' });
+            break;
+          }
+          const mergeResults = await this.globalWindowManager.mergeTabsToCurrentWindow(data.tabIds);
+          sendResponse({ success: true, data: mergeResults });
+          this.scheduleSidebarRefresh('tabs_merged_to_current_window');
+          break;
+
+        case 'findDuplicateTabs':
+          const dupMode = data?.mode || 'url';
+          const duplicateGroups = this.globalWindowManager.findDuplicateTabs(dupMode);
+          sendResponse({ success: true, data: duplicateGroups });
+          break;
+
+        case 'mergeDuplicateTabs':
+          if (!data?.group) {
+            sendResponse({ success: false, error: 'duplicate group data is required' });
+            break;
+          }
+          const mergeDupResult = await this.globalWindowManager.mergeDuplicateTabs(
+            data.group,
+            data.keepTabId
+          );
+          sendResponse({ success: true, data: mergeDupResult });
+          this.scheduleSidebarRefresh('duplicate_tabs_merged');
+          break;
+
+        case 'autoMergeAllDuplicates':
+          const autoMergeResult = await this.globalWindowManager.autoMergeAllDuplicates();
+          sendResponse({ success: true, data: autoMergeResult });
+          this.scheduleSidebarRefresh('all_duplicates_merged');
+          break;
+
+        case 'hibernateTab':
+          if (!data?.tabId) {
+            sendResponse({ success: false, error: 'tabId is required' });
+            break;
+          }
+          try {
+            const hibernateResult = await this.globalWindowManager.hibernateTab(data.tabId);
+            sendResponse({ success: true, data: hibernateResult });
+          } catch (hibernateError) {
+            sendResponse({ success: false, error: hibernateError.message });
+          }
+          break;
+
+        case 'restoreHibernatedTab':
+          if (!data?.tabId) {
+            sendResponse({ success: false, error: 'tabId is required' });
+            break;
+          }
+          try {
+            const restoreResult = await this.globalWindowManager.restoreHibernatedTab(data.tabId);
+            sendResponse({ success: true, data: restoreResult });
+          } catch (restoreError) {
+            sendResponse({ success: false, error: restoreError.message });
+          }
+          break;
+
+        case 'hibernateInactiveTabs':
+          const inactiveMinutes = data?.minutes || 30;
+          const hibernatedTabs = await this.globalWindowManager.hibernateInactiveTabs(inactiveMinutes);
+          sendResponse({ success: true, data: hibernatedTabs });
+          this.scheduleSidebarRefresh('inactive_tabs_hibernated');
+          break;
+
+        // Workspace Actions
+        case 'createWorkspace':
+          if (!data?.name) {
+            sendResponse({ success: false, error: 'workspace name is required' });
+            break;
+          }
+          const newWorkspace = await this.globalWindowManager.createWorkspace(
+            data.name,
+            data.description || '',
+            {
+              color: data.color,
+              icon: data.icon,
+              includeCurrentTabs: data.includeCurrentTabs
+            }
+          );
+          sendResponse({ success: true, data: newWorkspace });
+          break;
+
+        case 'saveCurrentWorkspace':
+          if (!data?.name) {
+            sendResponse({ success: false, error: 'workspace name is required' });
+            break;
+          }
+          const savedWorkspace = await this.globalWindowManager.saveCurrentWorkspace(
+            data.name,
+            data.description || ''
+          );
+          sendResponse({ success: true, data: savedWorkspace });
+          break;
+
+        case 'restoreWorkspace':
+          if (!data?.workspaceId) {
+            sendResponse({ success: false, error: 'workspaceId is required' });
+            break;
+          }
+          try {
+            const restoredWorkspace = await this.globalWindowManager.restoreWorkspace(
+              data.workspaceId,
+              { keepExistingTabs: data.keepExistingTabs }
+            );
+            sendResponse({ success: true, data: restoredWorkspace });
+            this.scheduleSidebarRefresh('workspace_restored');
+          } catch (restoreWsError) {
+            sendResponse({ success: false, error: restoreWsError.message });
+          }
+          break;
+
+        case 'deleteWorkspace':
+          if (!data?.workspaceId) {
+            sendResponse({ success: false, error: 'workspaceId is required' });
+            break;
+          }
+          try {
+            await this.globalWindowManager.deleteWorkspace(data.workspaceId);
+            sendResponse({ success: true });
+          } catch (deleteWsError) {
+            sendResponse({ success: false, error: deleteWsError.message });
+          }
+          break;
+
+        case 'updateWorkspace':
+          if (!data?.workspaceId || !data?.updates) {
+            sendResponse({ success: false, error: 'workspaceId and updates are required' });
+            break;
+          }
+          try {
+            const updatedWorkspace = await this.globalWindowManager.updateWorkspace(
+              data.workspaceId,
+              data.updates
+            );
+            sendResponse({ success: true, data: updatedWorkspace });
+          } catch (updateWsError) {
+            sendResponse({ success: false, error: updateWsError.message });
+          }
+          break;
+
+        case 'getAllWorkspaces':
+          const allWorkspaces = this.globalWindowManager.getAllWorkspaces();
+          sendResponse({ success: true, data: allWorkspaces });
+          break;
+
+        case 'getWorkspace':
+          if (!data?.workspaceId) {
+            sendResponse({ success: false, error: 'workspaceId is required' });
+            break;
+          }
+          const workspace = this.globalWindowManager.getWorkspace(data.workspaceId);
+          sendResponse({ success: true, data: workspace });
+          break;
+
+        case 'getGlobalWindowConfig':
+          const gwConfig = this.globalWindowManager.getConfig();
+          sendResponse({ success: true, data: gwConfig });
+          break;
+
+        case 'updateGlobalWindowConfig':
+          if (!data?.config) {
+            sendResponse({ success: false, error: 'config is required' });
+            break;
+          }
+          await this.globalWindowManager.updateConfig(data.config);
+          sendResponse({ success: true });
+          break;
+
+        case 'getGlobalWindowStats':
+          const gwStats = this.globalWindowManager.getStats();
+          sendResponse({ success: true, data: gwStats });
           break;
 
         default:

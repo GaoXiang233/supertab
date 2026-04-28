@@ -9,6 +9,21 @@ class SuperTabSettings {
       enableLogging: false,
       groupDisplayMode: 'sidebar'
     };
+    this.aiConfig = {
+      enableSemanticAnalysis: true,
+      enableSceneClassification: true,
+      enableDomainCorrelation: true,
+      enableBehaviorLearning: true,
+      confidenceThreshold: 0.6,
+      learningRate: 0.1
+    };
+    this.globalWindowConfig = {
+      enableAutoMergeDuplicates: true,
+      enableHibernation: true,
+      hibernationThresholdMinutes: 30,
+      maxHibernatedTabs: 50,
+      duplicateDetectionMode: 'url'
+    };
 
     this.initializeElements();
     this.setupEventListeners();
@@ -24,8 +39,33 @@ class SuperTabSettings {
 
       if (response.success) {
         this.settings = this.normalizeSettings(response.data);
-        this.updateUI();
       }
+
+      // Load AI config
+      try {
+        const aiConfigResponse = await chrome.runtime.sendMessage({
+          action: 'getAIConfig'
+        });
+        if (aiConfigResponse.success) {
+          this.aiConfig = { ...this.aiConfig, ...aiConfigResponse.data };
+        }
+      } catch (aiError) {
+        console.warn('加载AI配置失败:', aiError);
+      }
+
+      // Load global window config
+      try {
+        const gwConfigResponse = await chrome.runtime.sendMessage({
+          action: 'getGlobalWindowConfig'
+        });
+        if (gwConfigResponse.success) {
+          this.globalWindowConfig = { ...this.globalWindowConfig, ...gwConfigResponse.data };
+        }
+      } catch (gwError) {
+        console.warn('加载多窗口配置失败:', gwError);
+      }
+
+      this.updateUI();
     } catch (error) {
       console.error('加载设置失败:', error);
     }
@@ -46,7 +86,20 @@ class SuperTabSettings {
       version: document.getElementById('version'),
       feedbackLink: document.getElementById('feedback-link'),
       manageRules: document.getElementById('manage-rules'),
-      groupDisplayMode: document.getElementById('group-display-mode')
+      groupDisplayMode: document.getElementById('group-display-mode'),
+      // AI settings
+      enableSemanticAnalysis: document.getElementById('enable-semantic-analysis'),
+      enableSceneClassification: document.getElementById('enable-scene-classification'),
+      enableDomainCorrelation: document.getElementById('enable-domain-correlation'),
+      enableBehaviorLearning: document.getElementById('enable-behavior-learning'),
+      confidenceThreshold: document.getElementById('confidence-threshold'),
+      confidenceValue: document.getElementById('confidence-value'),
+      // Global window settings
+      enableAutoMergeDuplicates: document.getElementById('enable-auto-merge-duplicates'),
+      duplicateDetectionMode: document.getElementById('duplicate-detection-mode'),
+      enableHibernation: document.getElementById('enable-hibernation'),
+      hibernationThreshold: document.getElementById('hibernation-threshold'),
+      maxHibernatedTabs: document.getElementById('max-hibernated-tabs')
     };
   }
 
@@ -95,6 +148,15 @@ class SuperTabSettings {
     this.elements.manageRules.addEventListener('click', () => {
       this.navigateToRules();
     });
+
+    // Confidence threshold slider
+    if (this.elements.confidenceThreshold) {
+      this.elements.confidenceThreshold.addEventListener('input', (e) => {
+        if (this.elements.confidenceValue) {
+          this.elements.confidenceValue.textContent = `${e.target.value}%`;
+        }
+      });
+    }
   }
 
   updateUI() {
@@ -104,6 +166,44 @@ class SuperTabSettings {
     this.elements.autoCleanup.value = String(this.settings.autoCleanupDays ?? 30);
     if (this.elements.groupDisplayMode) {
       this.elements.groupDisplayMode.value = this.settings.groupDisplayMode === 'tab' ? 'tab' : 'sidebar';
+    }
+
+    // Update AI settings UI
+    if (this.elements.enableSemanticAnalysis) {
+      this.elements.enableSemanticAnalysis.checked = Boolean(this.aiConfig.enableSemanticAnalysis);
+    }
+    if (this.elements.enableSceneClassification) {
+      this.elements.enableSceneClassification.checked = Boolean(this.aiConfig.enableSceneClassification);
+    }
+    if (this.elements.enableDomainCorrelation) {
+      this.elements.enableDomainCorrelation.checked = Boolean(this.aiConfig.enableDomainCorrelation);
+    }
+    if (this.elements.enableBehaviorLearning) {
+      this.elements.enableBehaviorLearning.checked = Boolean(this.aiConfig.enableBehaviorLearning);
+    }
+    if (this.elements.confidenceThreshold) {
+      const thresholdValue = Math.round((this.aiConfig.confidenceThreshold || 0.6) * 100);
+      this.elements.confidenceThreshold.value = thresholdValue;
+      if (this.elements.confidenceValue) {
+        this.elements.confidenceValue.textContent = `${thresholdValue}%`;
+      }
+    }
+
+    // Update global window settings UI
+    if (this.elements.enableAutoMergeDuplicates) {
+      this.elements.enableAutoMergeDuplicates.checked = Boolean(this.globalWindowConfig.enableAutoMergeDuplicates);
+    }
+    if (this.elements.duplicateDetectionMode) {
+      this.elements.duplicateDetectionMode.value = this.globalWindowConfig.duplicateDetectionMode || 'url';
+    }
+    if (this.elements.enableHibernation) {
+      this.elements.enableHibernation.checked = Boolean(this.globalWindowConfig.enableHibernation);
+    }
+    if (this.elements.hibernationThreshold) {
+      this.elements.hibernationThreshold.value = String(this.globalWindowConfig.hibernationThresholdMinutes ?? 30);
+    }
+    if (this.elements.maxHibernatedTabs) {
+      this.elements.maxHibernatedTabs.value = String(this.globalWindowConfig.maxHibernatedTabs ?? 50);
     }
 
     // 更新版本信息
@@ -131,12 +231,51 @@ class SuperTabSettings {
         }
       });
 
-      if (response.success) {
-        this.showToast('设置已保存', 'success');
-        this.settings = { ...this.settings, ...newSettings };
-      } else {
-        throw new Error('保存设置失败');
+      if (!response.success) {
+        throw new Error('保存隐私设置失败');
       }
+
+      // Save AI config
+      const newAiConfig = {
+        enableSemanticAnalysis: this.elements.enableSemanticAnalysis?.checked ?? true,
+        enableSceneClassification: this.elements.enableSceneClassification?.checked ?? true,
+        enableDomainCorrelation: this.elements.enableDomainCorrelation?.checked ?? true,
+        enableBehaviorLearning: this.elements.enableBehaviorLearning?.checked ?? true,
+        confidenceThreshold: parseInt(this.elements.confidenceThreshold?.value ?? 60) / 100,
+        learningRate: 0.1
+      };
+
+      const aiConfigResponse = await chrome.runtime.sendMessage({
+        action: 'updateAIConfig',
+        data: { config: newAiConfig }
+      });
+
+      if (!aiConfigResponse.success) {
+        console.warn('保存AI配置失败:', aiConfigResponse.error);
+      }
+
+      // Save global window config
+      const newGwConfig = {
+        enableAutoMergeDuplicates: this.elements.enableAutoMergeDuplicates?.checked ?? true,
+        enableHibernation: this.elements.enableHibernation?.checked ?? true,
+        hibernationThresholdMinutes: parseInt(this.elements.hibernationThreshold?.value ?? 30),
+        maxHibernatedTabs: parseInt(this.elements.maxHibernatedTabs?.value ?? 50),
+        duplicateDetectionMode: this.elements.duplicateDetectionMode?.value ?? 'url'
+      };
+
+      const gwConfigResponse = await chrome.runtime.sendMessage({
+        action: 'updateGlobalWindowConfig',
+        data: { config: newGwConfig }
+      });
+
+      if (!gwConfigResponse.success) {
+        console.warn('保存多窗口配置失败:', gwConfigResponse.error);
+      }
+
+      this.showToast('设置已保存', 'success');
+      this.settings = { ...this.settings, ...newSettings };
+      this.aiConfig = { ...this.aiConfig, ...newAiConfig };
+      this.globalWindowConfig = { ...this.globalWindowConfig, ...newGwConfig };
     } catch (error) {
       console.error('保存设置失败:', error);
       this.showToast('保存设置失败: ' + error.message, 'error');
@@ -248,6 +387,23 @@ class SuperTabSettings {
       autoCleanupDays: 30,
       enableLogging: false,
       groupDisplayMode: 'sidebar'
+    };
+
+    this.aiConfig = {
+      enableSemanticAnalysis: true,
+      enableSceneClassification: true,
+      enableDomainCorrelation: true,
+      enableBehaviorLearning: true,
+      confidenceThreshold: 0.6,
+      learningRate: 0.1
+    };
+
+    this.globalWindowConfig = {
+      enableAutoMergeDuplicates: true,
+      enableHibernation: true,
+      hibernationThresholdMinutes: 30,
+      maxHibernatedTabs: 50,
+      duplicateDetectionMode: 'url'
     };
 
     this.updateUI();

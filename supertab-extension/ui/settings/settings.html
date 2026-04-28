@@ -100,6 +100,161 @@
                 </div>
             </section>
 
+            <!-- AI智能设置 -->
+            <section class="tf-settings-section">
+                <h2>AI智能设置</h2>
+
+                <div class="tf-setting-item">
+                    <div class="tf-setting-info">
+                        <label class="tf-setting-label">启用AI语义分析</label>
+                        <p class="tf-setting-description">
+                            启用AI引擎分析标签页内容，自动提取关键词和识别主题。
+                        </p>
+                    </div>
+                    <div class="tf-setting-control">
+                        <label class="tf-toggle">
+                            <input type="checkbox" id="enable-semantic-analysis" checked>
+                            <span class="tf-toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="tf-setting-item">
+                    <div class="tf-setting-info">
+                        <label class="tf-setting-label">启用场景分类</label>
+                        <p class="tf-setting-description">
+                            自动识别标签页所属场景（工作、学习、娱乐、开发、购物等）。
+                        </p>
+                    </div>
+                    <div class="tf-setting-control">
+                        <label class="tf-toggle">
+                            <input type="checkbox" id="enable-scene-classification" checked>
+                            <span class="tf-toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="tf-setting-item">
+                    <div class="tf-setting-info">
+                        <label class="tf-setting-label">启用域关联分析</label>
+                        <p class="tf-setting-description">
+                            分析不同域名之间的关联关系，支持跨域名归类。
+                        </p>
+                    </div>
+                    <div class="tf-setting-control">
+                        <label class="tf-toggle">
+                            <input type="checkbox" id="enable-domain-correlation" checked>
+                            <span class="tf-toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="tf-setting-item">
+                    <div class="tf-setting-info">
+                        <label class="tf-setting-label">启用行为学习</label>
+                        <p class="tf-setting-description">
+                            记录并学习您的操作行为，动态优化分组规则。
+                        </p>
+                    </div>
+                    <div class="tf-setting-control">
+                        <label class="tf-toggle">
+                            <input type="checkbox" id="enable-behavior-learning" checked>
+                            <span class="tf-toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="tf-setting-item">
+                    <div class="tf-setting-info">
+                        <label class="tf-setting-label" for="confidence-threshold">分类置信度阈值</label>
+                        <p class="tf-setting-description">
+                            只有当AI分类的置信度高于此值时才自动应用。
+                        </p>
+                    </div>
+                    <div class="tf-setting-control">
+                        <input type="range" id="confidence-threshold" min="0" max="100" value="60">
+                        <span class="tf-setting-unit" id="confidence-value">60%</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 多窗口管理设置 -->
+            <section class="tf-settings-section">
+                <h2>多窗口管理设置</h2>
+
+                <div class="tf-setting-item">
+                    <div class="tf-setting-info">
+                        <label class="tf-setting-label">自动合并重复标签页</label>
+                        <p class="tf-setting-description">
+                            检测并自动合并重复的标签页，保持标签页整洁。
+                        </p>
+                    </div>
+                    <div class="tf-setting-control">
+                        <label class="tf-toggle">
+                            <input type="checkbox" id="enable-auto-merge-duplicates" checked>
+                            <span class="tf-toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="tf-setting-item">
+                    <div class="tf-setting-info">
+                        <label class="tf-setting-label" for="duplicate-detection-mode">重复检测方式</label>
+                        <p class="tf-setting-description">
+                            选择检测重复标签页的方式。
+                        </p>
+                    </div>
+                    <div class="tf-setting-control">
+                        <select id="duplicate-detection-mode">
+                            <option value="url">仅URL匹配</option>
+                            <option value="title">仅标题匹配</option>
+                            <option value="both">URL和标题匹配</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="tf-setting-item">
+                    <div class="tf-setting-info">
+                        <label class="tf-setting-label">启用标签页休眠</label>
+                        <p class="tf-setting-description">
+                            长时间未使用的标签页将被休眠以节省内存。
+                        </p>
+                    </div>
+                    <div class="tf-setting-control">
+                        <label class="tf-toggle">
+                            <input type="checkbox" id="enable-hibernation" checked>
+                            <span class="tf-toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="tf-setting-item">
+                    <div class="tf-setting-info">
+                        <label class="tf-setting-label" for="hibernation-threshold">休眠阈值（分钟）</label>
+                        <p class="tf-setting-description">
+                            标签页在多长时间未被访问后进入休眠状态。
+                        </p>
+                    </div>
+                    <div class="tf-setting-control">
+                        <input type="number" id="hibernation-threshold" min="5" max="480" value="30">
+                        <span class="tf-setting-unit">分钟</span>
+                    </div>
+                </div>
+
+                <div class="tf-setting-item">
+                    <div class="tf-setting-info">
+                        <label class="tf-setting-label" for="max-hibernated-tabs">最大休眠标签数</label>
+                        <p class="tf-setting-description">
+                            最多保留多少个休眠的标签页记录。
+                        </p>
+                    </div>
+                    <div class="tf-setting-control">
+                        <input type="number" id="max-hibernated-tabs" min="10" max="200" value="50">
+                        <span class="tf-setting-unit">个</span>
+                    </div>
+                </div>
+            </section>
+
             <!-- 数据管理 -->
             <section class="tf-settings-section">
                 <h2>数据管理</h2>

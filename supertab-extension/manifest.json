@@ -41,7 +41,8 @@
       "resources": [
         "ui/rules/rules.html",
         "ui/rules/rules.css",
-        "ui/rules/rules-manager.js"
+        "ui/rules/rules-manager.js",
+        "ui/hibernated/hibernated.html"
       ],
       "matches": ["<all_urls>"]
     }
